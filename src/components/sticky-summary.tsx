@@ -22,6 +22,10 @@ type Figure = {
  * at exactly the moment they changed. This keeps the headline figures in view while
  * the form scrolls underneath.
  *
+ * Each figure gets its own full-width line rather than sharing one row of columns. A
+ * row of three looked tidier but left roughly a third of the width per number, which
+ * a seven-figure cedi amount does not fit into.
+ *
  * It pins to the TOP rather than the bottom. A bar along the bottom is the more
  * familiar pattern, but a fixed bottom element ends up behind the on-screen keyboard
  * precisely when it is needed, which is the whole point of having it.
@@ -41,7 +45,7 @@ export function StickySummary({
     period === "annual"
       ? [
           {
-            label: "Annual chargeable income",
+            label: "Chargeable income",
             value: annual ? formatGHS(annual.chargeableIncome) : EMPTY,
             primary: true,
           },
@@ -68,21 +72,25 @@ export function StickySummary({
 
   return (
     // aria-hidden: the same figures appear in full a few lines below, so announcing
-    // them twice on every keystroke would be noise for a screen reader.
+    // them again on every keystroke would be noise for a screen reader.
     <div
       aria-hidden
       className="bg-background/90 sticky top-0 z-20 -mx-4 border-b px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:hidden"
     >
-      <dl className="flex items-baseline justify-between gap-4">
+      <dl className="grid gap-0.5">
         {figures.map((figure) => (
-          <div key={figure.label} className="min-w-0">
-            <dt className="text-muted-foreground truncate text-[11px] font-medium">
+          <div
+            key={figure.label}
+            className="flex items-baseline justify-between gap-3"
+          >
+            {/* If anything has to give, it is the label — never the figure. */}
+            <dt className="text-muted-foreground min-w-0 truncate text-xs font-medium">
               {figure.label}
             </dt>
             <dd
               className={cn(
-                "tabular-nums",
-                figure.primary ? "text-base font-semibold" : "text-sm"
+                "shrink-0 tabular-nums",
+                figure.primary ? "text-lg font-semibold" : "text-sm"
               )}
             >
               {figure.value}
