@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { cn } from "cn"
 
 import {
   Form,
@@ -26,17 +27,15 @@ type SegmentedFieldProps = {
 }
 
 /**
- * A segmented choice (period, residency). ToggleGroup is a group of buttons rather
- * than a form control, so the accessible name comes from aria-label rather than a
- * <label for>.
+ * A segmented choice (period, residency).
  *
- * Deliberately unlabelled on screen and kept to a single compact row: the space this
- * frees goes to the figures, which are what the user is actually reading while they
- * type.
+ * The caption is part of this component rather than a row above both controls, so it
+ * travels with its own group when the row wraps on a narrow screen. `aria-labelledby`
+ * points at that same caption, so the visible wording is also the accessible name —
+ * one label, not a duplicate hidden one.
  *
- * The group is left content-sized (the primitive's own `w-fit`). Stretching it to a
- * share of the row squeezes the items, and "Foreigner" is the first thing to be cut
- * off on a narrow phone.
+ * The group stays content-sized (the primitive's own `w-fit`). Stretching it to a
+ * share of the row squeezes the items, and "Foreigner" is the first to be cut off.
  */
 function SegmentedField({
   form,
@@ -46,36 +45,45 @@ function SegmentedField({
   onSelect,
   className,
 }: SegmentedFieldProps) {
+  const labelId = React.useId()
+
   return (
     <FormField
       control={form.control}
       name={name}
       render={({ field }) => (
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          aria-label={label}
-          value={field.value}
-          // Radix reports "" when the active item is tapped again; dismissing the
-          // choice would leave the form in a state the schema cannot describe, so
-          // it is ignored and one of the two options always stays selected.
-          onValueChange={(value) => {
-            if (!value) return
-            field.onChange(value)
-            onSelect?.(value)
-          }}
-          className={className}
-        >
-          {options.map((option) => (
-            <ToggleGroupItem
-              key={option.value}
-              value={option.value}
-              className="h-10 px-3 text-xs sm:text-sm"
-            >
-              {option.label}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+        <div className={cn("space-y-1", className)}>
+          <p
+            id={labelId}
+            className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase"
+          >
+            {label}
+          </p>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            aria-labelledby={labelId}
+            value={field.value}
+            // Radix reports "" when the active item is tapped again; dismissing the
+            // choice would leave the form in a state the schema cannot describe, so
+            // it is ignored and one of the two options always stays selected.
+            onValueChange={(value) => {
+              if (!value) return
+              field.onChange(value)
+              onSelect?.(value)
+            }}
+          >
+            {options.map((option) => (
+              <ToggleGroupItem
+                key={option.value}
+                value={option.value}
+                className="h-10 px-3 text-xs sm:text-sm"
+              >
+                {option.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
       )}
     />
   )
@@ -146,7 +154,7 @@ export function PayeFormFields({ form }: { form: PayeForm }) {
             <SegmentedField
               form={form}
               name="period"
-              label="Calculation"
+              label="Pay period"
               options={[
                 { value: "monthly", label: "Monthly" },
                 { value: "annual", label: "Annual" },
@@ -179,8 +187,8 @@ export function PayeFormFields({ form }: { form: PayeForm }) {
 
           <p className="text-muted-foreground text-xs">
             {isAnnual
-              ? "Tax charged in, annual chargeable income out."
-              : "Gross pay in, SSNIT and PAYE out. Foreigners pay no SSNIT."}
+              ? "Tax charged in, chargeable income out."
+              : "Gross pay in, SSNIT and PAYE out."}
           </p>
         </div>
 
