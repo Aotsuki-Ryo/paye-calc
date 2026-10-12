@@ -34,8 +34,13 @@ It is also small enough to check by eye: roughly 1.3 MB, most of which is the fo
 pnpm build && pnpm preview     # verify the built site before shipping it
 ```
 
-Two notes:
+Three notes:
 
+- **Serving from a subpath needs `basePath`.** The exported HTML references its assets
+  as `/_next/...`, which assumes the site is at the root of a domain. That is fine for
+  Vercel, Netlify, Cloudflare Pages and a custom domain, but a *project* site on GitHub
+  Pages is served from `/<repo>/`, so add `basePath: "/<repo>"` (and `assetPrefix`) to
+  `next.config.ts` before building.
 - **`pnpm start` is gone** on purpose. It only serves a server-rendered build, which this
   no longer produces. Use `pnpm preview` for the static output.
 - **To go back to server rendering**, delete the `output: "export"` line in
