@@ -1,5 +1,11 @@
 import { PayeCalculator } from "@/components/paye-calculator";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Badge } from "@/components/ui/badge";
+import { formatGHS, formatRate } from "@/lib/tax/format";
+import {
+  SSNIT_RATE,
+  TAX_FREE_THRESHOLD_MONTHLY,
+} from "@/lib/tax/rate-table";
 
 export default function Home() {
   return (
@@ -15,6 +21,14 @@ export default function Home() {
         </div>
         <ThemeToggle />
       </header>
+
+      <div className="mb-6 flex flex-wrap gap-2">
+        <Badge variant="secondary">
+          Tax-free {formatGHS(TAX_FREE_THRESHOLD_MONTHLY)} a month
+        </Badge>
+        <Badge variant="secondary">SSNIT {formatRate(SSNIT_RATE)}</Badge>
+        <Badge variant="outline">GRA revised PAYE table</Badge>
+      </div>
 
       <PayeCalculator />
 

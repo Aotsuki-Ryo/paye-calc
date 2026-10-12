@@ -11,7 +11,6 @@ import { HistoryList } from "@/components/history-list"
 import { PayeFormFields } from "@/components/paye-form"
 import { RateReference } from "@/components/rate-reference"
 import { AnnualSummary, MonthlySummary } from "@/components/result-summary"
-import { StickySummary } from "@/components/sticky-summary"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -102,8 +101,6 @@ export function PayeCalculator() {
 
   return (
     <div className="space-y-6">
-      <StickySummary period={period} monthly={monthly} annual={annual} />
-
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start">
         <Card className="lg:sticky lg:top-6">
           <CardHeader>

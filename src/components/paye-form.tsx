@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { cn } from "cn"
 
 import {
   Form,
@@ -13,6 +12,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { defaultValues, type PayeForm } from "@/lib/validation/paye-schema"
 
@@ -20,30 +20,24 @@ type SegmentedFieldProps = {
   form: PayeForm
   name: "period" | "residency"
   label: string
+  hint: React.ReactNode
   options: readonly { value: string; label: string }[]
   /** Runs after the field is updated — used to clear the form when the direction changes. */
   onSelect?: (value: string) => void
-  className?: string
 }
 
 /**
- * A segmented choice (period, residency).
- *
- * The caption is part of this component rather than a row above both controls, so it
- * travels with its own group when the row wraps on a narrow screen. `aria-labelledby`
- * points at that same caption, so the visible wording is also the accessible name —
- * one label, not a duplicate hidden one.
- *
- * The group stays content-sized (the primitive's own `w-fit`). Stretching it to a
- * share of the row squeezes the items, and "Foreigner" is the first to be cut off.
+ * A segmented choice (period, residency). ToggleGroup is a group of buttons rather
+ * than a form control, so the accessible name is wired with aria-labelledby instead
+ * of a <label for>.
  */
 function SegmentedField({
   form,
   name,
   label,
+  hint,
   options,
   onSelect,
-  className,
 }: SegmentedFieldProps) {
   const labelId = React.useId()
 
@@ -52,13 +46,8 @@ function SegmentedField({
       control={form.control}
       name={name}
       render={({ field }) => (
-        <div className={cn("space-y-1", className)}>
-          <p
-            id={labelId}
-            className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase"
-          >
-            {label}
-          </p>
+        <FormItem className="gap-2">
+          <Label id={labelId}>{label}</Label>
           <ToggleGroup
             type="single"
             variant="outline"
@@ -72,18 +61,20 @@ function SegmentedField({
               field.onChange(value)
               onSelect?.(value)
             }}
+            className="w-full"
           >
             {options.map((option) => (
               <ToggleGroupItem
                 key={option.value}
                 value={option.value}
-                className="h-10 px-3 text-xs sm:text-sm"
+                className="h-11 flex-1 text-sm"
               >
                 {option.label}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
-        </div>
+          <p className="text-muted-foreground text-xs">{hint}</p>
+        </FormItem>
       )}
     />
   )
@@ -123,9 +114,7 @@ function MoneyField({
                 inputMode="decimal"
                 autoComplete="off"
                 placeholder={placeholder}
-                // scroll-mt clears the sticky summary bar when the browser scrolls a
-                // focused field into view, which would otherwise tuck it underneath.
-                className="h-11 scroll-mt-24 pl-12 text-base tabular-nums"
+                className="h-11 pl-12 text-base tabular-nums"
               />
             </FormControl>
           </div>
@@ -145,52 +134,29 @@ export function PayeFormFields({ form }: { form: PayeForm }) {
     // <Form> is shadcn's FormProvider — required by every FormField's useFormField.
     <Form {...form}>
       <div className="space-y-5">
-        {/* Both choices share one row, and the direction note below is a single line
-            whatever is selected, so the form costs as little height as possible. */}
-        <div className="space-y-1.5">
-          {/* Wraps to a second row rather than overflowing if a very narrow screen
-              cannot fit both groups side by side. */}
-          <div className="flex flex-wrap justify-between gap-2">
-            <SegmentedField
-              form={form}
-              name="period"
-              label="Pay period"
-              options={[
-                { value: "monthly", label: "Monthly" },
-                { value: "annual", label: "Annual" },
-              ]}
-              // The two directions take different inputs, so switching starts from a
-              // clean slate. Carrying the other direction's figures across would show
-              // an amount that no longer means what it did.
-              onSelect={(value) =>
-                form.reset({
-                  ...defaultValues,
-                  period: value === "annual" ? "annual" : "monthly",
-                })
-              }
-              className="scroll-mt-24"
-            />
-
-            {isAnnual ? null : (
-              <SegmentedField
-                form={form}
-                name="residency"
-                label="Employee status"
-                options={[
-                  { value: "citizen", label: "Citizen" },
-                  { value: "foreigner", label: "Foreigner" },
-                ]}
-                className="scroll-mt-24"
-              />
-            )}
-          </div>
-
-          <p className="text-muted-foreground text-xs">
-            {isAnnual
-              ? "Tax charged in, chargeable income out."
-              : "Gross pay in, SSNIT and PAYE out."}
-          </p>
-        </div>
+        <SegmentedField
+          form={form}
+          name="period"
+          label="Calculation"
+          hint={
+            isAnnual
+              ? "Given the tax charged, work back to the annual chargeable income."
+              : "Given gross pay, work out SSNIT, PAYE tax and net pay."
+          }
+          options={[
+            { value: "monthly", label: "Monthly" },
+            { value: "annual", label: "Annual" },
+          ]}
+          // The two directions take different inputs, so switching starts from a
+          // clean slate. Carrying the other direction's figures across would show
+          // an amount that no longer means what it did.
+          onSelect={(value) =>
+            form.reset({
+              ...defaultValues,
+              period: value === "annual" ? "annual" : "monthly",
+            })
+          }
+        />
 
         {isAnnual ? (
           // The annual direction is a reverse calculation: the tax is the input and
@@ -205,6 +171,17 @@ export function PayeFormFields({ form }: { form: PayeForm }) {
           />
         ) : (
           <>
+            <SegmentedField
+              form={form}
+              name="residency"
+              label="Employee status"
+              hint="Foreigners do not contribute to SSNIT, so the full pay is taxable."
+              options={[
+                { value: "citizen", label: "Citizen" },
+                { value: "foreigner", label: "Foreigner" },
+              ]}
+            />
+
             <MoneyField
               form={form}
               name="grossPay"
