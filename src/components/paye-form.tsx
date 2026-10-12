@@ -61,7 +61,7 @@ function SegmentedField({
               field.onChange(value)
               onSelect?.(value)
             }}
-            className="w-full"
+            className="w-full scroll-mt-24"
           >
             {options.map((option) => (
               <ToggleGroupItem
@@ -114,7 +114,9 @@ function MoneyField({
                 inputMode="decimal"
                 autoComplete="off"
                 placeholder={placeholder}
-                className="h-11 pl-12 text-base tabular-nums"
+                // scroll-mt clears the sticky summary bar when the browser scrolls a
+                // focused field into view, which would otherwise tuck it underneath.
+                className="h-11 scroll-mt-24 pl-12 text-base tabular-nums"
               />
             </FormControl>
           </div>
