@@ -1,12 +1,13 @@
 import type { Residency } from "@/lib/tax/calculate";
+import { DEFAULT_RATE_TABLE, type RateTableId } from "@/lib/tax/rate-table";
 import type { PayeFormValues } from "@/lib/validation/paye-schema";
 
 /**
  * Saved calculations, kept in localStorage.
  *
- * Only the INPUTS are stored, never the results. If the rate table is ever revised,
- * historical entries recompute against the current table instead of displaying
- * numbers that no longer follow the published rates.
+ * Only the INPUTS are stored, never the results. The rate table is one of those
+ * inputs, so an entry recomputes against the table it was saved with rather than
+ * against whichever one happens to be selected later.
  *
  * The two directions take different inputs, so an entry is a discriminated union
  * rather than a bag of half-empty fields.
@@ -20,6 +21,8 @@ type EntryBase = {
   id: string;
   /** Epoch milliseconds. */
   savedAt: number;
+  /** The rate table the entry was calculated against, so it restores faithfully. */
+  rateTable: RateTableId;
 };
 
 export type MonthlyHistoryEntry = EntryBase & {
@@ -44,6 +47,10 @@ function isResidency(value: unknown): value is Residency {
   return value === "citizen" || value === "foreigner";
 }
 
+function isRateTableId(value: unknown): value is RateTableId {
+  return value === "revised" || value === "legacy";
+}
+
 function isEntry(value: unknown): value is HistoryEntry {
   if (typeof value !== "object" || value === null) return false;
 
@@ -52,6 +59,13 @@ function isEntry(value: unknown): value is HistoryEntry {
     typeof entry.id === "string" && typeof entry.savedAt === "number";
 
   if (!hasBase) return false;
+
+  // Entries saved before the rate-table toggle have no `rateTable`. They are still
+  // valid — they were calculated against the revised table, which was the only one
+  // — and `readStorage` fills that in.
+  if (entry.rateTable !== undefined && !isRateTableId(entry.rateTable)) {
+    return false;
+  }
 
   if (entry.period === "monthly") {
     return (
@@ -86,7 +100,15 @@ function readStorage(): HistoryEntry[] {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
 
-    return parsed.filter(isEntry).slice(0, HISTORY_LIMIT);
+    return parsed
+      .filter(isEntry)
+      .map((entry) => ({
+        ...entry,
+        rateTable: isRateTableId(entry.rateTable)
+          ? entry.rateTable
+          : DEFAULT_RATE_TABLE,
+      }))
+      .slice(0, HISTORY_LIMIT);
   } catch {
     // Storage can be disabled or hold junk from an older version. A calculator
     // that refuses to open is worse than one that forgets.
@@ -163,6 +185,7 @@ export function addEntry(
   const isSameInputs = (existing: HistoryEntry) => {
     if (existing.period === "monthly" && entry.period === "monthly") {
       return (
+        existing.rateTable === entry.rateTable &&
         existing.residency === entry.residency &&
         existing.grossPay === entry.grossPay &&
         existing.allowance === entry.allowance
@@ -170,7 +193,10 @@ export function addEntry(
     }
 
     if (existing.period === "annual" && entry.period === "annual") {
-      return existing.taxCharged === entry.taxCharged;
+      return (
+        existing.rateTable === entry.rateTable &&
+        existing.taxCharged === entry.taxCharged
+      );
     }
 
     return false;
@@ -188,6 +214,7 @@ export function toFormValues(entry: HistoryEntry): PayeFormValues {
     return {
       period: "annual",
       residency: "citizen",
+      rateTable: entry.rateTable,
       grossPay: "",
       allowance: "",
       taxCharged: String(entry.taxCharged),
@@ -197,6 +224,7 @@ export function toFormValues(entry: HistoryEntry): PayeFormValues {
   return {
     period: "monthly",
     residency: entry.residency,
+    rateTable: entry.rateTable,
     grossPay: String(entry.grossPay),
     allowance: entry.allowance === 0 ? "" : String(entry.allowance),
     taxCharged: "",

@@ -27,7 +27,7 @@ function formatSavedAt(savedAt: number): string {
 
 /**
  * Saved calculations. Results are recomputed from the stored inputs rather than
- * stored themselves, so an entry always reflects the current rate table.
+ * stored themselves, so an entry always reflects the rate table it was saved with.
  */
 export function HistoryList({
   entries,
@@ -66,10 +66,15 @@ export function HistoryList({
                 entry.period === "annual"
                   ? {
                       badge: "Annual",
+                      rateLabel:
+                        entry.rateTable === "legacy" ? "2024 rates" : null,
                       residency: null,
                       inputs: `tax charged ${formatGHS(entry.taxCharged)}`,
                       headline: formatGHS(
-                        chargeableIncomeFromTax(entry.taxCharged).chargeableIncome
+                        chargeableIncomeFromTax(
+                          entry.taxCharged,
+                          entry.rateTable
+                        ).chargeableIncome
                       ),
                       headlineLabel: "chargeable",
                     }
@@ -78,10 +83,13 @@ export function HistoryList({
                         residency: entry.residency,
                         grossPay: entry.grossPay,
                         allowance: entry.allowance,
+                        rateTable: entry.rateTable,
                       })
 
                       return {
                         badge: "Monthly",
+                        rateLabel:
+                          entry.rateTable === "legacy" ? "2024 rates" : null,
                         residency:
                           entry.residency === "citizen" ? "Citizen" : "Foreigner",
                         inputs: `${formatGHS(entry.grossPay)} gross${entry.allowance > 0 ? ` + ${formatGHS(entry.allowance)} allowance` : ""} · tax ${formatGHS(result.tax)}`,
@@ -102,6 +110,9 @@ export function HistoryList({
                         <Badge variant="secondary">{details.badge}</Badge>
                         {details.residency ? (
                           <Badge variant="outline">{details.residency}</Badge>
+                        ) : null}
+                        {details.rateLabel ? (
+                          <Badge variant="outline">{details.rateLabel}</Badge>
                         ) : null}
                       </span>
                       <span className="text-muted-foreground mt-1 block text-xs tabular-nums lg:text-sm">

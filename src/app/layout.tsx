@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "PAYE Calculator — Ghana net pay and tax",
   description:
-    "Work out SSNIT, PAYE tax, chargeable income and net pay from a gross salary, using the GRA revised PAYE table.",
+    "Work out SSNIT, PAYE tax, chargeable income and net pay from a gross salary, using the GRA revised or 2024 PAYE table.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

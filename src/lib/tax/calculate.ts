@@ -15,7 +15,13 @@
  * `calculate.test.ts` pins every number here against hand-computed expectations.
  */
 
-import { ANNUAL_BANDS, MONTHLY_BANDS, SSNIT_RATE, type Band } from "./rate-table";
+import {
+  DEFAULT_RATE_TABLE,
+  SSNIT_RATE,
+  getRateTable,
+  type Band,
+  type RateTableId,
+} from "./rate-table";
 
 export type Residency = "citizen" | "foreigner";
 export type Period = "monthly" | "annual";
@@ -84,6 +90,8 @@ export type Breakdown = {
 
 export type MonthlyResult = {
   residency: Residency;
+  /** The table the figures were worked out against. */
+  rateTable: RateTableId;
   grossPay: number;
   allowance: number;
   ssnit: number;
@@ -96,6 +104,8 @@ export type MonthlyResult = {
 };
 
 export type AnnualResult = {
+  /** The table the figures were worked out against. */
+  rateTable: RateTableId;
   /** The figure the user supplied. */
   taxCharged: number;
   /** The answer: the chargeable income that produces that tax. */
@@ -106,6 +116,8 @@ export type AnnualResult = {
    * the most that could have been earned without incurring the charge.
    */
   atTaxFreeCeiling: boolean;
+  /** The chosen table's annual tax-free threshold, for the explanatory note. */
+  taxFreeThreshold: number;
   bandLines: BandLine[];
   effectiveRate: number;
 };
@@ -159,11 +171,16 @@ export function calculateMonthly({
   residency,
   grossPay,
   allowance = 0,
+  rateTable = DEFAULT_RATE_TABLE,
 }: {
   residency: Residency;
   grossPay: number;
   allowance?: number;
+  /** Which published table to tax against. Defaults to the revised one. */
+  rateTable?: RateTableId;
 }): MonthlyResult {
+  const table = getRateTable(rateTable);
+
   // Social security comes off first, and only for citizens. Rounding here (rather
   // than later) keeps every figure the user sees internally consistent.
   const ssnit = residency === "citizen" ? round2(grossPay * SSNIT_RATE) : 0;
@@ -171,7 +188,7 @@ export function calculateMonthly({
   // The allowance is added after social security, and it is taxable income.
   const chargeableIncome = round2(grossPay - ssnit + allowance);
 
-  const breakdown = taxOn(chargeableIncome, MONTHLY_BANDS);
+  const breakdown = taxOn(chargeableIncome, table.monthlyBands);
 
   // Derive net pay from the ROUNDED tax so the four numbers on screen add up by
   // hand: gross + allowance - ssnit - tax = net.
@@ -179,6 +196,7 @@ export function calculateMonthly({
 
   return {
     residency,
+    rateTable: table.id,
     grossPay,
     allowance,
     ssnit,
@@ -209,17 +227,23 @@ export function calculateMonthly({
  *   2,124 x 17.5% =    371.70   <- the charge runs out here
  *                    539.70     chargeable income 7,056+960+1,200+2,124 = 11,340
  */
-export function chargeableIncomeFromTax(taxCharged: number): AnnualResult {
+export function chargeableIncomeFromTax(
+  taxCharged: number,
+  rateTable: RateTableId = DEFAULT_RATE_TABLE
+): AnnualResult {
   const target = round2(Number.isFinite(taxCharged) ? Math.max(0, taxCharged) : 0);
-  const bands = ANNUAL_BANDS;
+  const table = getRateTable(rateTable);
+  const bands = table.annualBands;
 
   if (target === 0) {
-    const ceiling = bands[0].width;
+    const ceiling = table.taxFreeAnnual;
 
     return {
+      rateTable: table.id,
       taxCharged: 0,
       chargeableIncome: ceiling,
       atTaxFreeCeiling: true,
+      taxFreeThreshold: table.taxFreeAnnual,
       bandLines: [
         { label: bands[0].label, amount: ceiling, rate: 0, tax: 0, remaining: 0 },
       ],
@@ -281,9 +305,11 @@ export function chargeableIncomeFromTax(taxCharged: number): AnnualResult {
   }
 
   return {
+    rateTable: table.id,
     taxCharged: target,
     chargeableIncome,
     atTaxFreeCeiling: false,
+    taxFreeThreshold: table.taxFreeAnnual,
     bandLines: toBandLines(parts, chargeableIncome),
     effectiveRate: chargeableIncome > 0 ? target / chargeableIncome : 0,
   };

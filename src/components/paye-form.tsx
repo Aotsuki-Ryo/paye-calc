@@ -18,7 +18,7 @@ import { defaultValues, type PayeForm } from "@/lib/validation/paye-schema"
 
 type SegmentedFieldProps = {
   form: PayeForm
-  name: "period" | "residency"
+  name: "period" | "residency" | "rateTable"
   label: string
   hint: React.ReactNode
   options: readonly { value: string; label: string }[]
@@ -129,11 +129,27 @@ function MoneyField({
 export function PayeFormFields({ form }: { form: PayeForm }) {
   const period = form.watch("period")
   const isAnnual = period === "annual"
+  const isLegacy = form.watch("rateTable") === "legacy"
 
   return (
     // <Form> is shadcn's FormProvider — required by every FormField's useFormField.
     <Form {...form}>
       <div className="space-y-5">
+        <SegmentedField
+          form={form}
+          name="rateTable"
+          label="Rate table"
+          hint={
+            isLegacy
+              ? "The 2024 table — GH₵490 a month is tax free."
+              : "The revised table — GH₵588 a month is tax free."
+          }
+          options={[
+            { value: "revised", label: "New rates" },
+            { value: "legacy", label: "Old rates (2024)" },
+          ]}
+        />
+
         <SegmentedField
           form={form}
           name="period"
@@ -149,10 +165,12 @@ export function PayeFormFields({ form }: { form: PayeForm }) {
           ]}
           // The two directions take different inputs, so switching starts from a
           // clean slate. Carrying the other direction's figures across would show
-          // an amount that no longer means what it did.
+          // an amount that no longer means what it did. The rate table survives,
+          // because it is a property of the tax rules rather than of the figures.
           onSelect={(value) =>
             form.reset({
               ...defaultValues,
+              rateTable: form.getValues("rateTable"),
               period: value === "annual" ? "annual" : "monthly",
             })
           }

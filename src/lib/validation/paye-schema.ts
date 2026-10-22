@@ -20,6 +20,8 @@ export const payeFormSchema = z
   .object({
     period: z.enum(["monthly", "annual"]),
     residency: z.enum(["citizen", "foreigner"]),
+    /** Which published rate table the figures are taxed against. */
+    rateTable: z.enum(["revised", "legacy"]),
     grossPay: z.string(),
     allowance: z.string(),
     taxCharged: z.string(),
@@ -37,6 +39,7 @@ export const payeFormSchema = z
   .transform((values) => ({
     period: values.period,
     residency: values.residency,
+    rateTable: values.rateTable,
     grossPay: toAmount(values.grossPay),
     allowance: toAmount(values.allowance),
     taxCharged: toAmount(values.taxCharged),
@@ -125,6 +128,7 @@ export type PayeFormData = z.output<typeof payeFormSchema>;
 export const defaultValues: PayeFormValues = {
   period: "monthly",
   residency: "citizen",
+  rateTable: "revised",
   grossPay: "",
   allowance: "",
   taxCharged: "",

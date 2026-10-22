@@ -4,6 +4,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardContent,
@@ -12,14 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { formatGHS, formatRate } from "@/lib/tax/format"
-import {
-  ANNUAL_BANDS,
-  MONTHLY_BANDS,
-  SSNIT_RATE,
-  TAX_FREE_THRESHOLD_ANNUAL,
-  TAX_FREE_THRESHOLD_MONTHLY,
-  type Band,
-} from "@/lib/tax/rate-table"
+import { SSNIT_RATE, type Band, type RateTable } from "@/lib/tax/rate-table"
 
 function BandList({ bands }: { bands: readonly Band[] }) {
   return (
@@ -39,15 +33,22 @@ function BandList({ bands }: { bands: readonly Band[] }) {
   )
 }
 
-/** The published table this app implements, so the numbers can be checked against it. */
-export function RateReference() {
+/**
+ * The published table the figures are being calculated against, so the numbers can
+ * be checked against the official document. It follows the rate-table toggle.
+ */
+export function RateReference({ table }: { table: RateTable }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Rates used</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          Rates used
+          <Badge variant="secondary">{table.name}</Badge>
+        </CardTitle>
         <CardDescription>
-          Tax-free threshold {formatGHS(TAX_FREE_THRESHOLD_MONTHLY)} a month or{" "}
-          {formatGHS(TAX_FREE_THRESHOLD_ANNUAL)} a year. SSNIT is{" "}
+          {table.description} Tax-free threshold{" "}
+          {formatGHS(table.taxFreeMonthly)} a month or{" "}
+          {formatGHS(table.taxFreeAnnual)} a year. SSNIT is{" "}
           {formatRate(SSNIT_RATE)} of gross pay for citizens.
         </CardDescription>
       </CardHeader>
@@ -56,13 +57,13 @@ export function RateReference() {
           <AccordionItem value="monthly">
             <AccordionTrigger>Monthly table</AccordionTrigger>
             <AccordionContent>
-              <BandList bands={MONTHLY_BANDS} />
+              <BandList bands={table.monthlyBands} />
             </AccordionContent>
           </AccordionItem>
           <AccordionItem value="annual">
             <AccordionTrigger>Annual table</AccordionTrigger>
             <AccordionContent>
-              <BandList bands={ANNUAL_BANDS} />
+              <BandList bands={table.annualBands} />
             </AccordionContent>
           </AccordionItem>
         </Accordion>

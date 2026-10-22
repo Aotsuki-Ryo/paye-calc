@@ -6,7 +6,12 @@ import {
   round2,
   taxOn,
 } from "./calculate";
-import { ANNUAL_BANDS, MONTHLY_BANDS, SSNIT_RATE } from "./rate-table";
+import {
+  ANNUAL_BANDS,
+  MONTHLY_BANDS,
+  RATE_TABLES,
+  SSNIT_RATE,
+} from "./rate-table";
 
 /**
  * Expected values here were computed by hand from the GRA table, band by band, and
@@ -410,5 +415,153 @@ describe("annual: tax charged to chargeable income", () => {
     expect(taxOn(recovered, ANNUAL_BANDS).tax).toBe(charge);
     // The answer sits within a pesewa of any of the incomes consistent with it.
     expect(Math.abs(recovered - 85_000.55)).toBeLessThanOrEqual(0.01);
+  });
+});
+
+describe("the 2024 (legacy) rate table", () => {
+  const legacy = RATE_TABLES.legacy;
+  const monthly = legacy.monthlyBands;
+  const annual = legacy.annualBands;
+
+  it("has seven bands ending in an unbounded 35% top band", () => {
+    expect(monthly).toHaveLength(7);
+    expect(annual).toHaveLength(7);
+
+    for (const bands of [monthly, annual]) {
+      expect(bands.at(-1)?.width).toBe(Infinity);
+      expect(bands.at(-1)?.rate).toBe(0.35);
+      expect(bands[0].rate).toBe(0);
+    }
+  });
+
+  it("sums its capped widths to the published 2024 cumulative totals", () => {
+    // Only the capped bands are finite; their sum is exactly what the last row of
+    // the table prints after "Exceeding" — GH₵50,416.67 a month, GH₵605,000 a year.
+    const sum = (widths: readonly number[]) =>
+      widths
+        .filter((width) => Number.isFinite(width))
+        .reduce((total, width) => total + width, 0);
+
+    expect(sum(monthly.map((band) => band.width))).toBeCloseTo(
+      50_416.666666666664,
+      6,
+    );
+    expect(sum(annual.map((band) => band.width))).toBe(605_000);
+  });
+
+  it("scales every annual band by exactly twelve months", () => {
+    // The fourth monthly width is 38,000 / 12, so its product with twelve lands a
+    // rounding error away from 38,000 rather than on it.
+    monthly.forEach((monthlyBand, index) => {
+      expect(annual[index].width).toBeCloseTo(monthlyBand.width * 12, 6);
+      expect(annual[index].rate).toBe(monthlyBand.rate);
+    });
+  });
+
+  it.each([
+    // [chargeable income, expected tax] — cumulative band boundaries
+    [490, 0], //          490@0%
+    [600, 5.5], //        + 110@5%
+    [730, 18.5], //       + 130@10%
+    [3_896.67, 572.67], //   + 3,166.67@17.5%
+    [19_896.67, 4_572.67], // + 16,000@25%
+    [50_416.67, 13_728.67], // + 30,520@30%
+    [100_000, 31_082.83], //  + 49,583.33@35%
+  ])("taxes %d at %d", (income, expected) => {
+    expect(taxOn(income, monthly).tax).toBeCloseTo(expected, 2);
+  });
+
+  it("rounds the total once, not each band's tax", () => {
+    // 13,728.6667 is owed by the capped bands, then 49,583.3333 at 35% adds
+    // 17,354.1667: 31,082.8333 in total, which rounds to 31,082.83.
+    // Rounding each band first would give 572.67 + 4,000 + 9,156 + 17,354.17 =
+    // 31,082.84 — a pesewa more, and wrong. taxOn rounds only the total.
+    expect(taxOn(100_000, monthly).tax).toBe(31_082.83);
+    expect(taxOn(100_000, monthly).tax).not.toBe(31_082.84);
+  });
+
+  it("deducts SSNIT and taxes the balance on a GH₵5,000 salary", () => {
+    const result = calculateMonthly({
+      residency: "citizen",
+      grossPay: 5_000,
+      rateTable: "legacy",
+    });
+
+    expect(result.rateTable).toBe("legacy");
+    expect(result.ssnit).toBe(275);
+    expect(result.chargeableIncome).toBe(4_725);
+    // 490@0% + 110@5% + 130@10% + 3,166.67@17.5% + 828.33@25% = 779.75
+    expect(result.tax).toBe(779.75);
+    expect(result.netPay).toBe(3_945.25);
+  });
+
+  it("leaves the default (revised) answer unchanged", () => {
+    const legacyResult = calculateMonthly({
+      residency: "citizen",
+      grossPay: 5_000,
+      rateTable: "legacy",
+    });
+    const defaultResult = calculateMonthly({
+      residency: "citizen",
+      grossPay: 5_000,
+    });
+
+    expect(defaultResult.rateTable).toBe("revised");
+    expect(defaultResult.tax).toBe(785.75);
+    expect(defaultResult.netPay).toBe(3_939.25);
+
+    expect(legacyResult.tax).not.toBe(defaultResult.tax);
+    expect(legacyResult.netPay).not.toBe(defaultResult.netPay);
+  });
+
+  it("charges a foreigner on the full GH₵5,000, with no SSNIT", () => {
+    const result = calculateMonthly({
+      residency: "foreigner",
+      grossPay: 5_000,
+      rateTable: "legacy",
+    });
+
+    expect(result.ssnit).toBe(0);
+    expect(result.chargeableIncome).toBe(5_000);
+    // 490@0% + 110@5% + 130@10% + 3,166.67@17.5% + 1,103.33@25% = 848.50
+    expect(result.tax).toBe(848.5);
+    expect(result.netPay).toBe(4_151.5);
+  });
+
+  it("returns the legacy tax-free ceiling when nothing was charged", () => {
+    const result = chargeableIncomeFromTax(0, "legacy");
+
+    expect(result.chargeableIncome).toBe(5_880);
+    expect(result.atTaxFreeCeiling).toBe(true);
+    expect(result.rateTable).toBe("legacy");
+  });
+
+  it.each([
+    // [tax charged, chargeable income] — every legacy band boundary
+    [66, 7_200], //        second band exactly full
+    [164_744, 605_000], // sixth band exactly full
+  ])("maps a charge of %d back to %d", (tax, income) => {
+    const result = chargeableIncomeFromTax(tax, "legacy");
+
+    expect(result.chargeableIncome).toBe(income);
+    expect(result.rateTable).toBe("legacy");
+    expect(result.atTaxFreeCeiling).toBe(false);
+  });
+
+  it("keeps going through the unbounded 35% band", () => {
+    // 164,744 fills the table, then everything above GH₵605,000 is taxed at 35%.
+    const result = chargeableIncomeFromTax(164_744 + 35_000, "legacy");
+
+    expect(result.chargeableIncome).toBe(705_000);
+    expect(result.bandLines.at(-1)?.rate).toBe(0.35);
+  });
+
+  it("round-trips annual income through its charge and back", () => {
+    for (const income of [5_880, 7_200, 8_760, 46_760, 238_760, 605_000]) {
+      const tax = taxOn(income, annual).tax;
+      expect(chargeableIncomeFromTax(tax, "legacy").chargeableIncome).toBe(
+        income,
+      );
+    }
   });
 });

@@ -1,15 +1,17 @@
 # Ghana PAYE Calculator
 
-Works out PAYE (Pay As You Earn) for Ghana in **both directions**, on the GRA revised
-PAYE table. Mobile-first, no backend, nothing leaves the browser.
+Works out PAYE (Pay As You Earn) for Ghana in **both directions**, on the GRA PAYE
+tables — the revised rates, or the 2024 table they replaced. Mobile-first, no backend,
+nothing leaves the browser.
 
 - **Monthly** — gross pay in → SSNIT, PAYE tax and net pay out.
 - **Annual** — tax charged in → annual chargeable income out (the reverse direction).
+- **Rate table** — a toggle switches both directions between the revised and 2024 tables.
 
 ```bash
 pnpm install
 pnpm dev        # http://localhost:3000
-pnpm test       # 66 tests over the tax maths and the input validation
+pnpm test       # 85 tests over the tax maths and the input validation
 pnpm build      # static site into out/
 pnpm preview    # serve that out/ folder locally
 ```
@@ -48,10 +50,15 @@ Three notes:
   You would also need to restore `cacheComponents` / `partialPrefetching` if you want
   them — Next refuses to build with those alongside a static export.
 
-## The rate table
+## The rate tables
 
 The single source of truth is `src/lib/tax/rate-table.ts`. Bands are **widths**, not
 upper bounds — a rate applies only to the slice of income inside its own band.
+
+Two tables live there, and the **Rate table** toggle at the top of the form picks
+between them for both directions. Saved calculations record which one they used.
+
+### Revised rates (default)
 
 | Band | Monthly | Annual | Rate |
 |---|---|---|---|
@@ -63,9 +70,27 @@ upper bounds — a rate applies only to the slice of income inside its own band.
 | 6 | Next GH₵30,332 | Next GH₵363,984 | 30% |
 | 7 | Exceeding GH₵50,000 | Exceeding GH₵600,000 | 35% |
 
-Monthly widths sum to GH₵50,000 and annual widths to GH₵600,000. Every annual band is
-exactly the monthly band × 12, which is why a month's PAYE annualises cleanly. Tests
-assert all three properties, so editing the table cannot silently produce wrong tax.
+Monthly widths sum to GH₵50,000 and annual widths to GH₵600,000.
+
+### 2024 rates
+
+| Band | Monthly | Annual | Rate |
+|---|---|---|---|
+| 1 | First GH₵490 | First GH₵5,880 | 0% |
+| 2 | Next GH₵110 | Next GH₵1,320 | 5% |
+| 3 | Next GH₵130 | Next GH₵1,560 | 10% |
+| 4 | Next GH₵3,166.67 | Next GH₵38,000 | 17.5% |
+| 5 | Next GH₵16,000 | Next GH₵192,000 | 25% |
+| 6 | Next GH₵30,520 | Next GH₵366,240 | 30% |
+| 7 | Exceeding GH₵50,416.67 | Exceeding GH₵605,000 | 35% |
+
+Monthly widths sum to GH₵50,416.67 and annual widths to GH₵605,000. The printed table
+shows the fourth monthly band as GH₵3,166.67; the exact `38,000 / 12` is used instead,
+so the monthly and annual results agree to the pesewa.
+
+Every annual band is exactly the monthly band × 12, which is why a month's PAYE
+annualises cleanly. Tests assert this for both tables, along with the printed
+cumulative totals, so editing a table cannot silently produce wrong tax.
 
 ## Monthly, forwards
 

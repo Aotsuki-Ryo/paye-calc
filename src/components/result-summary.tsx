@@ -3,7 +3,6 @@ import { cn } from "cn"
 import { Card, CardContent } from "@/components/ui/card"
 import type { AnnualResult, MonthlyResult } from "@/lib/tax/calculate"
 import { formatGHS, formatPercent } from "@/lib/tax/format"
-import { TAX_FREE_THRESHOLD_ANNUAL } from "@/lib/tax/rate-table"
 
 const EMPTY = "—"
 
@@ -212,7 +211,7 @@ export function AnnualSummary({ result }: { result: AnnualResult | null }) {
           {result?.atTaxFreeCeiling ? (
             <p className="text-muted-foreground mt-2 text-xs">
               No tax was charged. Every chargeable income up to{" "}
-              {formatGHS(TAX_FREE_THRESHOLD_ANNUAL)} produces no tax, so the figure
+              {formatGHS(result.taxFreeThreshold)} produces no tax, so the figure
               shown is that ceiling — the most that could have been earned without
               incurring a charge.
             </p>

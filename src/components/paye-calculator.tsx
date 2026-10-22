@@ -11,6 +11,7 @@ import { HistoryList } from "@/components/history-list"
 import { PayeFormFields } from "@/components/paye-form"
 import { RateReference } from "@/components/rate-reference"
 import { AnnualSummary, MonthlySummary } from "@/components/result-summary"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -34,7 +35,8 @@ import {
   chargeableIncomeFromTax,
   type Period,
 } from "@/lib/tax/calculate"
-import { formatGHS } from "@/lib/tax/format"
+import { formatGHS, formatRate } from "@/lib/tax/format"
+import { SSNIT_RATE, getRateTable } from "@/lib/tax/rate-table"
 import {
   defaultValues,
   payeFormSchema,
@@ -58,10 +60,22 @@ export function PayeCalculator() {
   const parsed = payeFormSchema.safeParse(values)
   const data = parsed.success ? parsed.data : null
   const period: Period = values.period === "annual" ? "annual" : "monthly"
+  const rateTable = getRateTable(values.rateTable)
 
   // The two directions are genuinely different calculations, not two views of one.
-  const monthly = data?.period === "monthly" ? calculateMonthly(data) : null
-  const annual = data?.period === "annual" ? chargeableIncomeFromTax(data.taxCharged) : null
+  const monthly =
+    data?.period === "monthly"
+      ? calculateMonthly({
+          residency: data.residency,
+          grossPay: data.grossPay,
+          allowance: data.allowance,
+          rateTable: data.rateTable,
+        })
+      : null
+  const annual =
+    data?.period === "annual"
+      ? chargeableIncomeFromTax(data.taxCharged, data.rateTable)
+      : null
 
   // Saved calculations live in localStorage, which is state outside React — read
   // through useSyncExternalStore rather than copied into state by an effect. The
@@ -81,11 +95,13 @@ export function PayeCalculator() {
           ? createEntry({
               period: "monthly",
               residency: submitted.residency,
+              rateTable: submitted.rateTable,
               grossPay: submitted.grossPay,
               allowance: submitted.allowance,
             })
           : createEntry({
               period: "annual",
+              rateTable: submitted.rateTable,
               taxCharged: submitted.taxCharged,
             })
       )
@@ -101,6 +117,16 @@ export function PayeCalculator() {
 
   return (
     <div className="space-y-6">
+      {/* These follow the rate-table toggle, so they can never claim a threshold
+          the calculation is not using. */}
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="secondary">
+          Tax-free {formatGHS(rateTable.taxFreeMonthly)} a month
+        </Badge>
+        <Badge variant="secondary">SSNIT {formatRate(SSNIT_RATE)}</Badge>
+        <Badge variant="outline">{rateTable.name}</Badge>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start">
         <Card className="lg:sticky lg:top-6">
           <CardHeader>
@@ -159,7 +185,7 @@ export function PayeCalculator() {
           onSelect={(entry) => form.reset(toFormValues(entry))}
           onClear={() => writeHistory([])}
         />
-        <RateReference />
+        <RateReference table={rateTable} />
       </div>
     </div>
   )
